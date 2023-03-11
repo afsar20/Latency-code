@@ -1,0 +1,95 @@
+iimport pandas as pd 
+
+  
+
+# Read in the two Excel files as DataFrames 
+
+df1 = pd.read_excel('LE Prod ES Feb 16 2023.xlsx', sheet_name=['P1 And P2 data', 'P3 Data']) 
+
+df2 = pd.read_excel('LE Prod THD Feb 21 2023.xlsx', sheet_name=['P1 And P2 data', 'P3 Data']) 
+
+  
+
+# Concatenate the two DataFrames 
+
+concatenated_df = pd.concat([df1['P1 And P2 data'], df1['P3 Data'], df2['P1 And P2 data'], df2['P3 Data']]) 
+
+  
+
+concatenated_df = concatenated_df.loc[:, ~concatenated_df.columns.str.contains('^Unnamed')] 
+
+  
+
+concatenated_df.head(10) 
+
+  
+
+# Write the concatenated DataFrame to a new Excel file 
+
+# concatenated_df.to_excel('concatenated_file.xlsx', index=False) 
+
+import numpy as np 
+
+  
+
+# select data with TIF filter 
+
+df = concatenated_df.copy() 
+
+  
+
+# Create a 'Count' column with value 1 to be used to calculate the frequency of each Latency 
+
+df['Count'] = 1 
+
+  
+
+# Calculate the frequency of each Latency within each group 
+
+freq = df.groupby(['Partition', 'Date', 'UserName', 'Latency'])['Count'].sum().reset_index(name='freq') 
+
+  
+
+# Calculate the frequency-weighted mean Latency for each group 
+
+mean_latency = (df['Latency'] * df['Count']).groupby(['Partition', 'Date', 'UserName']).sum() / df.groupby(['Partition', 'Date', 'UserName'])['Count'].transform('sum') 
+
+  
+
+# Calculate the frequency-weighted median Latency for each group 
+
+def weighted_median(group): 
+
+    d = group['Latency'] 
+
+    w = group['Count'] 
+
+    return (np.percentile(d, 50, interpolation='nearest', weights=w)) 
+
+  
+
+median_latency = df.groupby(['Partition', 'Date', 'UserName']).apply(weighted_median) 
+
+  
+
+# Create a new dataframe to store the results 
+
+results_df = pd.DataFrame({'Mean Latency': mean_latency, 'Median Latency': median_latency}) 
+
+  
+
+# Reset the index and move the group columns to regular columns 
+
+results_df = results_df.reset_index() 
+
+  
+
+# Rearrange the column order to match the original dataframe 
+
+results_df = results_df[['Partition', 'Date', 'UserName', 'Mean Latency', 'Median Latency']] 
+
+  
+
+print(results_df) 
+
+ 
